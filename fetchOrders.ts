@@ -6,10 +6,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const shopify = shopifyApi({
-  apiKey: process.env.SHOPIFY_API_KEY!,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET_KEY!,
+  apiKey: process.env.STORE_API_KEY!,
+  apiSecretKey: process.env.STORE_API_SECRET_KEY!,
   scopes: ['read_orders'],
-  hostName: process.env.SHOPIFY_SHOP!,
+  hostName: process.env.SHOP!,
   apiVersion: LATEST_API_VERSION,
   isEmbeddedApp: false,
 });
