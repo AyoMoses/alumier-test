@@ -39,10 +39,18 @@ const shopify = shopifyApi({
   isEmbeddedApp: false,
 });
 
+interface OrderProduct {
+  id: string;
+  title: string;
+  quantity: number;
+}
+
 interface Order {
   id: string;
   name: string;
+  customerName: string;
   createdAt: string;
+  products: OrderProduct[];
 }
 
 async function fetchOrdersWithProduct(productId: string): Promise<void> {
@@ -73,12 +81,18 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
               id
               name
               createdAt
+              customer {
+                firstName
+                lastName
+              }
               lineItems(first: 250) {
                 edges {
                   node {
                     product {
                       id
+                      title
                     }
+                    quantity
                   }
                 }
               }
@@ -111,7 +125,13 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
         .map((edge: any) => ({
           id: edge.node.id,
           name: edge.node.name,
+          customerName: `${edge.node.customer.firstName} ${edge.node.customer.lastName}`,
           createdAt: edge.node.createdAt,
+          products: edge.node.lineItems.edges.map((item: any) => ({
+            id: item.node.product.id,
+            title: item.node.product.title,
+            quantity: item.node.quantity,
+          })),
         }));
 
       orders = orders.concat(fetchedOrders);
@@ -124,9 +144,17 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
       `Found ${orders.length} orders containing the product within the last 30 days:`
     );
     orders.forEach((order) => {
-      console.log(
-        `Order ID: ${order.id}, Order Number: ${order.name}, Created At: ${order.createdAt}`
-      );
+      console.log(`Order ID: ${order.id}`);
+      console.log(`Order Number: ${order.name}`);
+      console.log(`Customer Name: ${order.customerName}`);
+      console.log(`Created At: ${order.createdAt}`);
+      console.log('Products:');
+      order.products.forEach((product) => {
+        console.log(
+          `  - ID: ${product.id}, Title: ${product.title}, Quantity: ${product.quantity}`
+        );
+      });
+      console.log('---');
     });
 
     if (orders.length === 0) {
@@ -142,7 +170,7 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
   }
 }
 
-
+// Usage
 const productId = process.argv[2];
 if (!productId) {
   console.error('Please provide a product ID as a command-line argument.');
