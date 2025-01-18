@@ -1,14 +1,13 @@
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
+import dotenv from 'dotenv';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+dotenv.config();
+
+if (!process.env.SENDGRID_API_KEY) {
+  throw new Error('SENDGRID_API_KEY is not set in the environment variables');
+}
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 export const sendAlertEmail = async (
   productTitle: string,
@@ -16,9 +15,9 @@ export const sendAlertEmail = async (
   newPrice: number,
   percentageDecrease: number
 ) => {
-  const mailOptions = {
-    from: process.env.EMAIL_FROM,
-    to: process.env.EMAIL_TO,
+  const msg = {
+    to: process.env.EMAIL_TO!,
+    from: process.env.EMAIL_FROM!,
     subject: 'Product Price Alert',
     html: `
       <h1>Price Alert for ${productTitle}</h1>
@@ -32,9 +31,14 @@ export const sendAlertEmail = async (
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    console.log('Alert email sent successfully');
-  } catch (error) {
+    const response = await sgMail.send(msg);
+    console.log('Alert email sent successfully', response);
+    return response;
+  } catch (error: any) {
     console.error('Error sending alert email:', error);
+    if (error.response) {
+      console.error(error.response.body);
+    }
+    throw error;
   }
 };
