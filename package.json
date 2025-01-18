@@ -2,24 +2,24 @@
   "name": "alumier-orders",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "fetchOrders.ts",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node --loader ts-node/esm fetchOrders.ts"
   },
-  "keywords": [],
+  "keywords": ["shopify", "orders", "graphql"],
   "author": "ayoMoses",
   "license": "ISC",
   "dependencies": {
-    "@shopify/admin-api-client": "^1.0.4",
-    "@shopify/graphql-client": "^1.2.1",
-    "@shopify/shopify-api": "^11.7.0",
+    "@shopify/shopify-api": "^7.5.0",
     "dotenv": "^16.4.7",
     "graphql": "^16.10.0",
-    "graphql-request": "^7.1.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.3"
+    "graphql-request": "^6.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7"
+    "@types/node": "^18.16.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
   }
 }
+
