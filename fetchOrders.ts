@@ -11,11 +11,22 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: `${__dirname}/.env` });
 
 // Check if required environment variables are set
-const requiredEnvVars = ['SHOP', 'ACCESS_TOKEN', 'STORE_API_KEY', 'STORE_API_SECRET_KEY'];
-const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+const requiredEnvVars = [
+  'SHOP',
+  'ACCESS_TOKEN',
+  'STORE_API_KEY',
+  'STORE_API_SECRET_KEY',
+];
+const missingEnvVars = requiredEnvVars.filter(
+  (varName) => !process.env[varName]
+);
 
 if (missingEnvVars.length > 0) {
-  console.error(`Error: Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  console.error(
+    `Error: Missing required environment variables: ${missingEnvVars.join(
+      ', '
+    )}`
+  );
   process.exit(1);
 }
 
@@ -36,11 +47,14 @@ interface Order {
 
 async function fetchOrdersWithProduct(productId: string): Promise<void> {
   try {
-    const client = new GraphQLClient(`${process.env.SHOP}/admin/api/${LATEST_API_VERSION}/graphql.json`, {
-      headers: {
-        'X-Shopify-Access-Token': process.env.ACCESS_TOKEN!,
-      },
-    });
+    const client = new GraphQLClient(
+      `${process.env.SHOP}/admin/api/${LATEST_API_VERSION}/graphql.json`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': process.env.ACCESS_TOKEN!,
+        },
+      }
+    );
 
     // Calculate the date 30 days ago
     const thirtyDaysAgo = new Date();
@@ -81,15 +95,17 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
     while (hasNextPage) {
       const variables = {
         cursor: cursor,
-        queryString: `created_at:>='${formattedDate}'`
+        queryString: `created_at:>='${formattedDate}'`,
       };
 
       const response: any = await client.request(query, variables);
-      
+
       const fetchedOrders = response.orders.edges
-        .filter((edge: any) => 
-          edge.node.lineItems.edges.some((item: any) => 
-            item.node.product && item.node.product.id === `gid://shopify/Product/${productId}`
+        .filter((edge: any) =>
+          edge.node.lineItems.edges.some(
+            (item: any) =>
+              item.node.product &&
+              item.node.product.id === `gid://shopify/Product/${productId}`
           )
         )
         .map((edge: any) => ({
@@ -104,21 +120,29 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
       cursor = response.orders.pageInfo.endCursor;
     }
 
-    console.log(`Found ${orders.length} orders containing the product within the last 30 days:`);
-    orders.forEach(order => {
-      console.log(`Order ID: ${order.id}, Order Number: ${order.name}, Created At: ${order.createdAt}`);
+    console.log(
+      `Found ${orders.length} orders containing the product within the last 30 days:`
+    );
+    orders.forEach((order) => {
+      console.log(
+        `Order ID: ${order.id}, Order Number: ${order.name}, Created At: ${order.createdAt}`
+      );
     });
 
     if (orders.length === 0) {
-      console.log(`No orders found containing the product with ID: ${productId} within the last 30 days`);
-      console.log('Please verify that the product ID is correct and exists in your store, and that there are orders within the last 30 days.');
+      console.log(
+        `No orders found containing the product with ID: ${productId} within the last 30 days`
+      );
+      console.log(
+        'Please verify that the product ID is correct and exists in your store, and that there are orders within the last 30 days.'
+      );
     }
   } catch (error) {
     console.error('Error fetching orders:', error);
   }
 }
 
-// Usage
+
 const productId = process.argv[2];
 if (!productId) {
   console.error('Please provide a product ID as a command-line argument.');
