@@ -1,5 +1,3 @@
-import { shopifyApi, LATEST_API_VERSION } from '@shopify/shopify-api';
-import '@shopify/shopify-api/adapters/node';
 import { GraphQLClient } from 'graphql-request';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -8,15 +6,10 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-dotenv.config({ path: `${__dirname}/.env` });
+dotenv.config({ path: `${dirname(__dirname)}/.env` });
 
 // Check if required environment variables are set
-const requiredEnvVars = [
-  'SHOP',
-  'ACCESS_TOKEN',
-  'STORE_API_KEY',
-  'STORE_API_SECRET_KEY',
-];
+const requiredEnvVars = ['SHOP', 'ACCESS_TOKEN'];
 const missingEnvVars = requiredEnvVars.filter(
   (varName) => !process.env[varName]
 );
@@ -30,14 +23,14 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-const shopify = shopifyApi({
-  apiKey: process.env.STORE_API_KEY!,
-  apiSecretKey: process.env.STORE_API_SECRET_KEY!,
-  scopes: ['read_orders'],
-  hostName: new URL(process.env.SHOP!).hostname,
-  apiVersion: LATEST_API_VERSION,
-  isEmbeddedApp: false,
-});
+const client = new GraphQLClient(
+  `https://${process.env.SHOP}/admin/api/2024-10/graphql.json`,
+  {
+    headers: {
+      'X-Shopify-Access-Token': process.env.ACCESS_TOKEN!,
+    },
+  }
+);
 
 interface OrderProduct {
   id: string;
@@ -55,15 +48,6 @@ interface Order {
 
 async function fetchOrdersWithProduct(productId: string): Promise<void> {
   try {
-    const client = new GraphQLClient(
-      `${process.env.SHOP}/admin/api/${LATEST_API_VERSION}/graphql.json`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': process.env.ACCESS_TOKEN!,
-        },
-      }
-    );
-
     // Calculate the date 30 days ago
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -109,30 +93,34 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
     while (hasNextPage) {
       const variables = {
         cursor: cursor,
-        queryString: `created_at:>='${formattedDate}'`,
+        queryString: `created_at:>='${formattedDate}' AND line_items.product_id:${productId}`,
       };
 
       const response: any = await client.request(query, variables);
 
       const fetchedOrders = response.orders.edges
-        .filter((edge: any) =>
-          edge.node.lineItems.edges.some(
-            (item: any) =>
-              item.node.product &&
-              item.node.product.id === `gid://shopify/Product/${productId}`
-          )
-        )
         .map((edge: any) => ({
           id: edge.node.id,
           name: edge.node.name,
-          customerName: `${edge.node.customer.firstName} ${edge.node.customer.lastName}`,
+          customerName: edge.node.customer
+            ? `${edge.node.customer.firstName || ''} ${
+                edge.node.customer.lastName || ''
+              }`.trim() || 'N/A'
+            : 'N/A',
           createdAt: edge.node.createdAt,
-          products: edge.node.lineItems.edges.map((item: any) => ({
-            id: item.node.product.id,
-            title: item.node.product.title,
-            quantity: item.node.quantity,
-          })),
-        }));
+          products: edge.node.lineItems.edges
+            .filter(
+              (item: any) =>
+                item.node.product &&
+                item.node.product.id === `gid://shopify/Product/${productId}`
+            )
+            .map((item: any) => ({
+              id: item.node.product.id,
+              title: item.node.product.title,
+              quantity: item.node.quantity,
+            })),
+        }))
+        .filter((order: Order) => order.products.length > 0);
 
       orders = orders.concat(fetchedOrders);
 

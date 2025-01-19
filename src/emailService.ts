@@ -20,8 +20,10 @@ export const sendAlertEmail = async (
     from: process.env.EMAIL_FROM!,
     subject: 'Product Price Alert',
     html: `
-      <h1>Price Alert for ${productTitle}</h1>
-      <p>The price has decreased by more than 20%.</p>
+      <h1>Don't miss the price drop for ${productTitle}</h1>
+      <p>The price has decreased by more than ${percentageDecrease.toFixed(
+        2
+      )}%. Best take advantage</p>
       <ul>
         <li>Old Price: $${oldPrice.toFixed(2)}</li>
         <li>New Price: $${newPrice.toFixed(2)}</li>
