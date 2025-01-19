@@ -1,33 +1,22 @@
 import { GraphQLClient } from 'graphql-request';
 import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import readline from 'readline';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+dotenv.config();
 
-dotenv.config({ path: `${dirname(__dirname)}/.env` });
+const SHOPIFY_SHOP = process.env.SHOP;
+const SHOPIFY_ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 
-// Check if required environment variables are set
-const requiredEnvVars = ['SHOP', 'ACCESS_TOKEN'];
-const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !process.env[varName]
-);
-
-if (missingEnvVars.length > 0) {
-  console.error(
-    `Error: Missing required environment variables: ${missingEnvVars.join(
-      ', '
-    )}`
-  );
+if (!SHOPIFY_SHOP || !SHOPIFY_ACCESS_TOKEN) {
+  console.error('Error: SHOP and ACCESS_TOKEN must be set in the .env file');
   process.exit(1);
 }
 
 const client = new GraphQLClient(
-  `https://${process.env.SHOP}/admin/api/2024-10/graphql.json`,
+  `https://${SHOPIFY_SHOP}/admin/api/2024-10/graphql.json`,
   {
     headers: {
-      'X-Shopify-Access-Token': process.env.ACCESS_TOKEN!,
+      'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
     },
   }
 );
@@ -93,12 +82,19 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
     while (hasNextPage) {
       const variables = {
         cursor: cursor,
-        queryString: `created_at:>='${formattedDate}' AND line_items.product_id:${productId}`,
+        queryString: `created_at:>='${formattedDate}'`,
       };
 
       const response: any = await client.request(query, variables);
 
       const fetchedOrders = response.orders.edges
+        .filter((edge: any) =>
+          edge.node.lineItems.edges.some(
+            (item: any) =>
+              item.node.product &&
+              item.node.product.id === `gid://shopify/Product/${productId}`
+          )
+        )
         .map((edge: any) => ({
           id: edge.node.id,
           name: edge.node.name,
@@ -108,19 +104,12 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
               }`.trim() || 'N/A'
             : 'N/A',
           createdAt: edge.node.createdAt,
-          products: edge.node.lineItems.edges
-            .filter(
-              (item: any) =>
-                item.node.product &&
-                item.node.product.id === `gid://shopify/Product/${productId}`
-            )
-            .map((item: any) => ({
-              id: item.node.product.id,
-              title: item.node.product.title,
-              quantity: item.node.quantity,
-            })),
-        }))
-        .filter((order: Order) => order.products.length > 0);
+          products: edge.node.lineItems.edges.map((item: any) => ({
+            id: item.node.product?.id || 'N/A',
+            title: item.node.product?.title || 'N/A',
+            quantity: item.node.quantity,
+          })),
+        }));
 
       orders = orders.concat(fetchedOrders);
 
@@ -158,11 +147,33 @@ async function fetchOrdersWithProduct(productId: string): Promise<void> {
   }
 }
 
-// Usage
-const productId = process.argv[2];
-if (!productId) {
-  console.error('Please provide a product ID as a command-line argument.');
-  process.exit(1);
+function promptForProductId(): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question('Please enter a product ID: ', (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
 }
 
-fetchOrdersWithProduct(productId);
+async function main() {
+  let productId = process.argv[2];
+
+  if (!productId) {
+    productId = await promptForProductId();
+  }
+
+  if (!productId) {
+    console.error('No product ID provided. Exiting.');
+    process.exit(1);
+  }
+
+  await fetchOrdersWithProduct(productId);
+}
+
+main();
